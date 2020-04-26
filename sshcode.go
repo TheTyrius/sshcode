@@ -33,6 +33,7 @@ type options struct {
 	syncBack         bool
 	noOpen           bool
 	reuseConnection  bool
+	usePrivateSocket bool
 	bindAddr         string
 	remotePort       string
 	sshFlags         string
@@ -144,12 +145,20 @@ func sshCode(host, dir string, o options) error {
 
 	flog.Info("Tunneling remote port %v to %v", o.remotePort, o.bindAddr)
 
-	sshCmdStr :=
-		fmt.Sprintf("ssh -tt -q -L %v:localhost:%v %v %v 'cd %v; %v --host 127.0.0.1 --auth none --port=%v'",
-			o.bindAddr, o.remotePort, o.sshFlags, host, dir, codeServerPath, o.remotePort,
-		)
-
-	// Starts code-server and forwards the remote port.
+	var sshCmdStr string
+	if !o.usePrivateSocket {
+		sshCmdStr =
+			fmt.Sprintf("ssh -tt -q -L %v:localhost:%v %v %v 'cd %v; %v --host 127.0.0.1 --auth none --port=%v'",
+				o.bindAddr, o.remotePort, o.sshFlags, host, dir, codeServerPath, o.remotePort,
+			)
+	} else {
+		sshCmdStr =
+			// todo: forward socket, not port
+			fmt.Sprintf("ssh -tt -q -L %v:localhost:%v %v %v 'cd %v; %v --socket %v --host 127.0.0.1 --auth none --port=%v'",
+				o.bindAddr, o.remotePort, o.sshFlags, host, dir, codeServerPath, codeServerSocketPath, o.remotePort,
+			)
+	}
+	// Starts code-server and forwards the remote.
 	sshCmd := exec.Command("sh", "-l", "-c", sshCmdStr)
 	sshCmd.Stdin = os.Stdin
 	sshCmd.Stdout = os.Stdout
